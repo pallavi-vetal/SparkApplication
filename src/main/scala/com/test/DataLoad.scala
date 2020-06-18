@@ -1,30 +1,22 @@
-package com.test
-
+package  com.test
 import com.mongodb.MongoClient
 import com.mongodb.client.{MongoCollection, MongoDatabase}
-import com.mongodb.spark.MongoSpark
-import com.mongodb.spark.config.WriteConfig
+import com.mongodb.spark._
+
 import org.apache.spark.sql.SparkSession
 import org.bson.Document
 
-import scala.util.parsing.json.JSONObject
+
+
 
 object DataLoad{
-  def main(args: String): Unit = {
+  def main(spark:SparkSession,args: String): Unit = {
     val t1 = System.nanoTime
     println("Processing started....... ")
-    //val log = LogManager.getRootLogger
-    //log.setLevel(Level.WARN)
-    val spark = SparkSession
-      .builder()
-      .appName("Load_Data_From_CSV_To_MongoDB")
-      .master("local")
-      .config("spark.mongodb.input.uri","mongodb://localhost:27017/org.testTable")
-      .config("spark.mongodb.output.uri","mongodb://localhost:27017/org.testTable")
-      .getOrCreate()
+
 
     val sc = spark.sparkContext
-    //sc.setLogLevel("warning")
+
     if (args.length == 0) {
       println("\nPlease provide product file location\n")
       System.exit(1)
@@ -38,7 +30,11 @@ object DataLoad{
       .option("sep",",")
       .option("inferSchema",true)
       .load(path)
-    val mongoClient: MongoClient = new MongoClient("localhost",27017)
+
+    import com.mongodb.spark.config._
+
+    import scala.util.parsing.json.JSONObject
+    val mongoClient: MongoClient = new MongoClient("127.0.0.1",27017)
     val database: MongoDatabase = mongoClient.getDatabase("org")
     val collection: MongoCollection[Document] = database.getCollection("testTable")
     val writeConfig = WriteConfig(Map("collection"->"testTable",
@@ -48,7 +44,7 @@ object DataLoad{
     m1 = m1 ++ Map("sku"->"text")
     val js1 = JSONObject(m1).toString()
     val parsedJs = Document.parse(js1)
-   collection.createIndex(parsedJs)
+    collection.createIndex(parsedJs)
 
 
     val sparkDocs = dataDF.rdd.mapPartitions(partition=>{
@@ -77,11 +73,25 @@ object DataLoad{
       }).toIterator
       docs
     })
+    import com.mongodb.spark.config._
     MongoSpark.save(sparkDocs,writeConfig)
     println("Processing completed ...............")
     val duration = (System.nanoTime - t1) / 1e9d
 
     print("Total Time Taken : "+duration+" seconds\n")
-    return duration
+    null
   }
 }
+/*
+spark-submit --deploy-mode client  --class DataRead --jars=`find /Users/vetalpallavi21/docker-spark-cluster/apps -print | grep -i '.*[.]jar' | tr '\n' ','` /Users/vetalpallavi21/Scala/TestDataLoadV.0.2/target/TestDataLoadV.0.2-1.0-SNAPSHOT.jar
+spark-submit --deploy-mode client  --class DataLoad --jars=`find /Users/vetalpallavi21/docker-spark-cluster/apps -print | grep -i '.*[.]jar' | tr '\n' ','`  /Users/vetalpallavi21/Scala/TestDataLoadV.0.2/target/TestDataLoadV.0.2-1.0-SNAPSHOT.jar
+db.testTable.update(
+   { sku: "more-car-those" },
+   { $set:
+      {
+        name: "pallavi"
+      }
+   },
+   {multi:true}
+)
+ */
